@@ -6,10 +6,10 @@ library(wordle)
 library(fansi)
 
 nGuesses <- 6
+nLetters <- 5
 initRow <- rep(" ", nGuesses)
-inputInit <- data.frame('Letter 1' = initRow, 'Letter 2' = initRow,
-                        'Letter 3' = initRow, 'Letter 4' = initRow,
-                        'Letter 5' = initRow)
+inputInit <- as.data.frame(matrix(' ', nGuesses, nLetters))
+colnames(inputInit) <- paste("Letter.", 1:nLetters, sep = '')
 
 isLetterJS <- paste0("[", paste0(paste0("'", c(letters, LETTERS), "'"), 
                                  collapse = ","), "].indexOf(value) > -1")
@@ -31,58 +31,29 @@ ansi2html <- function(ansi){
   ))
 }
 
-ui <- function() {
+# unfortunately the way to pass extra parameters when creating the rhandsonetable and then accessing it through params doesn't work for me
+# This is a workaround to color the cells
+colorRenderer <-  function(colorMat){
+  greenInds <- which(colorMat == 'green', arr.ind = T)
+  rowGreenInds <- greenInds[,1]-1
+  colGreenInds <- greenInds[,2]-1
+  yellowInds <- which(colorMat == 'yellow', arr.ind = T)
+  rowYellowInds <- yellowInds[,1]-1
+  colYellowInds <- yellowInds[,2]-1
+  greyInds <- which(colorMat == 'grey', arr.ind = T)
+  rowGreyInds <- greyInds[,1]-1
+  colGreyInds <- greyInds[,2]-1
   
-  fluidPage(
-    useShinyjs(),
-    tags$head(
-      tags$style(
-        HTML(".shiny-notification {
-             position:fixed;
-             top: calc(10%);
-             left: calc(50%);
-             }
-             "
-        )
-      )
-    ),
-    rHandsontableOutput('InputTable'),
-      # , verbatimTextOutput("debug")
-      # , keyboardInput("keebs", color_palette = "sharla1")
-    actionButton(inputId = "done", label = "Check"),
-    tags$hr(),
-    htmlOutput("result") 
-  )
-}
-
-server <- function(input, output) {
-  gameState <- reactiveValues()
-  gameState$wordleGame <- WordleGame$new(wordle_dict, target_word = 'shire')
-  gameState$lockedRows <- 2:6
-  gameState$inputTable <- inputInit
-  gameState$colorMat <- matrix("TBD", 6, 5)
-  gameState$is_solved <- F
-  colorRenderer <-  function(colorMat){
-    greenInds <- which(colorMat == 'green', arr.ind = T)
-    rowGreenInds <- greenInds[,1]-1
-    colGreenInds <- greenInds[,2]-1
-    yellowInds <- which(colorMat == 'yellow', arr.ind = T)
-    rowYellowInds <- yellowInds[,1]-1
-    colYellowInds <- yellowInds[,2]-1
-    greyInds <- which(colorMat == 'grey', arr.ind = T)
-    rowGreyInds <- greyInds[,1]-1
-    colGreyInds <- greyInds[,2]-1
-    
-    rowIndJSGreen <- paste("[", paste(rowGreenInds, collapse = ","), "]", sep = "")
-    colIndJSGreen <- paste("[", paste(colGreenInds, collapse = ","), "]", sep = "")
-    
-    rowIndJSYellow <- paste("[", paste(rowYellowInds, collapse = ","), "]", sep = "")
-    colIndJSYellow <- paste("[", paste(colYellowInds, collapse = ","), "]", sep = "")
-    
-    rowIndJSGrey <- paste("[", paste(rowGreyInds, collapse = ","), "]", sep = "")
-    colIndJSGrey <- paste("[", paste(colGreyInds, collapse = ","), "]", sep = "")
-    
-    paste("
+  rowIndJSGreen <- paste("[", paste(rowGreenInds, collapse = ","), "]", sep = "")
+  colIndJSGreen <- paste("[", paste(colGreenInds, collapse = ","), "]", sep = "")
+  
+  rowIndJSYellow <- paste("[", paste(rowYellowInds, collapse = ","), "]", sep = "")
+  colIndJSYellow <- paste("[", paste(colYellowInds, collapse = ","), "]", sep = "")
+  
+  rowIndJSGrey <- paste("[", paste(rowGreyInds, collapse = ","), "]", sep = "")
+  colIndJSGrey <- paste("[", paste(colGreyInds, collapse = ","), "]", sep = "")
+  
+  paste("
           function(instance, td, row, col, prop, value, cellProperties) {
             Handsontable.renderers.TextRenderer.apply(this, arguments);
             rowArrayGreen = ", rowIndJSGreen,"
@@ -111,14 +82,47 @@ server <- function(input, output) {
             }
             return td;
           }", sep = ''
-    )
-  }
+  )
+}
+
+ui <- function() {
+  
+  fluidPage(
+    useShinyjs(),
+    tags$head(
+      tags$style(
+        HTML(".shiny-notification {
+             position:fixed;
+             top: calc(10%);
+             left: calc(50%);
+             }
+             "
+        )
+      )
+    ),
+    rHandsontableOutput('InputTable'),
+      # , verbatimTextOutput("debug")
+      # , keyboardInput("keebs", color_palette = "sharla1")
+    actionButton(inputId = "done", label = "Check"),
+    tags$hr(),
+    htmlOutput("result") 
+  )
+}
+
+server <- function(input, output) {
+  gameState <- reactiveValues()
+  gameState$wordleGame <- WordleGame$new(wordle_dict)
+  gameState$lockedRows <- 2:nGuesses
+  gameState$inputTable <- inputInit
+  gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
+  gameState$is_solved <- F
   
   output$InputTable <- renderRHandsontable({
     inputHOT <- rhandsontable(gameState$inputTable) %>%
       hot_row(gameState$lockedRows, readOnly = T) %>%
       hot_cols(renderer = colorRenderer(gameState$colorMat)) %>%
-      hot_validate_character(cols = 1:5, choices = c(LETTERS, letters), allowInvalid = F) %>%
+      # hot_validate_character(cols = 1:nLetters, choices = c(LETTERS, letters), allowInvalid = F) %>%
+      # this will disallow typing of non-letters or multiple letters in one cell
       hot_cols(validator = paste("
            function (value, callback) {
             setTimeout(function(){
@@ -132,18 +136,14 @@ server <- function(input, output) {
   observeEvent(input$done, {
     inputTable <- hot_to_r(input$InputTable)
     nAttempt <- length(gameState$wordleGame$attempts)
-    if(nAttempt<=5){
+    if(nAttempt<=nGuesses-1){
       # read the attempt
       attempt <- tolower(paste(inputTable[nAttempt+1, ], collapse = ''))
-      # if (nAttempt == 5)
-      #   browser()
-      # validate the attempt
       
       # update game state
       res <- gameState$wordleGame$try(attempt, quiet = T)
       if(is.null(res)){
-        # gameState$inputTable[nAttempt+1,] <- rep(' ', 5)
-        # input$InputTable$data[[nAttempt+1]] <- as.list(rep(' ', 5))
+        # this happens when the attempt is not in the word list
         showNotification('Not a valid word in the word list.')
       } else {
         # update InputTable and colors
@@ -152,20 +152,23 @@ server <- function(input, output) {
         # lock guessed rows and unlock one more row if game is not done
         if(gameState$wordleGame$is_solved()){
           showNotification("Success!")
-          gameState$lockedRows <- 1:6
+          gameState$lockedRows <- 1:nGuesses
           shinyjs::disable("done")
           gameState$is_solved <- T
           # gameState$wordleGame$share()
-          # blocksToShare <- getBlocksToShare(gameState$wordleGame)
-          TEST <- 1
         } else {
-          if (nAttempt>4){
+          # failed after all tries
+          if (nAttempt>nGuesses-2){
             showNotification("Try again later!")
             shinyjs::disable("done")
           }
-          gameState$lockedRows <- (1:6)[-(nAttempt+2)]
+          gameState$lockedRows <- (1:nGuesses)[-(nAttempt+2)]
         }
-        shinyjs::runjs('HTMLWidgets.getInstance(InputTable).hot.selectCell(1,0)')
+        # to do: figure out a way to auto select the cell to the right after typing one letter (if possible)
+        # select the first cell of the next row and start edit mode
+        selectNextRowJS <- paste("HTMLWidgets.getInstance(InputTable).hot.selectCell(", nAttempt+1, ",0)
+                                  HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().beginEditing()", sep = '')
+        shinyjs::runjs(selectNextRowJS)
       }
     }
   })
