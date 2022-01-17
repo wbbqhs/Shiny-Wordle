@@ -6,3 +6,4 @@ This is a Shiny app based on the R wordle package by Hannah Park available [here
 Original game [wordle](https://www.powerlanguage.co.uk/wordle/)
 
 
+![Screenshot of this app](image/example.png)
