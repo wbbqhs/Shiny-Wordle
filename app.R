@@ -4,7 +4,8 @@ library(shinyjs)
 library(rhandsontable)
 library(wordle)
 library(fansi)
-
+# use a randomized version of the official wordle word list
+load('data/wordle_dict_rand.Rda')
 nGuesses <- 6
 nLetters <- 5
 initRow <- rep(" ", nGuesses)
@@ -109,15 +110,22 @@ ui <- function() {
   )
 }
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   gameState <- reactiveValues()
-  gameState$wordleGame <- WordleGame$new(wordle_dict)
+  # make sure there is a word of the day
+  wordIndex <- as.numeric(difftime(Sys.Date(), as.Date('2022-01-15'), units = 'days'))
+  gameState$wordleGame <- WordleGame$new(wordle_dict, wordle_dict_rand[wordIndex])
   gameState$lockedRows <- 2:nGuesses
   gameState$inputTable <- inputInit
   gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
   gameState$is_solved <- F
   
   output$InputTable <- renderRHandsontable({
+    # add ability to disable the game (e.g. when deployed on a server, change this so each user can only play it once a day)
+    if(F){
+      shinyjs::disable("done")
+      showNotification('You have already played this today.', duration = 10)
+    }
     inputHOT <- rhandsontable(gameState$inputTable) %>%
       hot_row(gameState$lockedRows, readOnly = T) %>%
       hot_cols(renderer = colorRenderer(gameState$colorMat)) %>%
