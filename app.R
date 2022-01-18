@@ -11,7 +11,7 @@ nLetters <- 5
 initRow <- rep(" ", nGuesses)
 inputInit <- as.data.frame(matrix(' ', nGuesses, nLetters))
 colnames(inputInit) <- paste("Letter.", 1:nLetters, sep = '')
-
+testMode <- F
 isLetterJS <- paste0("[", paste0(paste0("'", c(letters, LETTERS), "'"), 
                                  collapse = ","), "].indexOf(value) > -1")
 
@@ -101,9 +101,20 @@ ui <- function() {
         )
       )
     ),
+    
+    radioButtons("gameMode", "Game Mode",
+                 choices = list("Daily Challenge" = "daily", "Unlimited" = "unlimited"),
+                 selected = "daily"),
+    conditionalPanel(condition = "input.gameMode == 'unlimited'",
+                     # Input: Select a file ----
+                     actionButton(inputId = "getNewWord", label = "Play a new word")
+                     ),
+    # Horizontal line ----
+    tags$hr(),
     rHandsontableOutput('InputTable'),
       # , verbatimTextOutput("debug")
       # , keyboardInput("keebs", color_palette = "sharla1")
+    br(),
     actionButton(inputId = "done", label = "Check"),
     tags$hr(),
     htmlOutput("result") 
@@ -114,11 +125,49 @@ server <- function(input, output, session) {
   gameState <- reactiveValues()
   # make sure there is a word of the day
   wordIndex <- as.numeric(difftime(Sys.Date(), as.Date('2022-01-15'), units = 'days'))
-  gameState$wordleGame <- WordleGame$new(wordle_dict, wordle_dict_rand[wordIndex])
-  gameState$lockedRows <- 2:nGuesses
-  gameState$inputTable <- inputInit
-  gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
-  gameState$is_solved <- F
+  
+  observeEvent(input$gameMode, {
+    if(!is.null(input$InputTable)){
+      # exit the edit mode start edit mode on the first cell
+      selectFirstCellJS <- paste("HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().cancelChanges()
+                                  HTMLWidgets.getInstance(InputTable).hot.selectCell(0,0)
+                                  HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().beginEditing()", sep = '')
+      shinyjs::runjs(selectFirstCellJS)
+    }
+    if (input$gameMode == "daily"){
+      targetWord <- wordle_dict_rand[wordIndex]
+    } else {
+      targetWord <- wordle_dict_rand[sample(1:length(wordle_dict_rand), 1)]
+    }
+    shinyjs::enable("done")
+    gameState$wordleGame <- WordleGame$new(wordle_dict_rand, target_word = targetWord)
+    gameState$lockedRows <- 2:nGuesses
+    gameState$inputTable <- inputInit
+    gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
+    gameState$is_solved <- F
+    gameState$failed <- F
+  })
+  
+  observeEvent(input$getNewWord, {
+    # there should be a way to avoid code duplication but not gonna mess with it for now
+    if(!is.null(input$InputTable)){
+      # issue: cell (0, 0) will retain the previously rendered background color until it has exit edit mode
+      selectFirstCellJS <- paste("HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().cancelChanges()
+                                  HTMLWidgets.getInstance(InputTable).hot.selectCell(0,0)
+                                  HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().beginEditing()", sep = '')
+      shinyjs::runjs(selectFirstCellJS)
+    }
+    if (input$gameMode == "unlimited"){
+      shinyjs::enable("done")
+      targetWord <- wordle_dict_rand[sample(1:length(wordle_dict_rand), 1)]
+      gameState$wordleGame <- WordleGame$new(wordle_dict_rand, target_word = targetWord)
+      gameState$lockedRows <- 2:nGuesses
+      gameState$inputTable <- inputInit
+      gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
+      gameState$is_solved <- F
+      gameState$failed <- F
+    }
+  })
   
   output$InputTable <- renderRHandsontable({
     # add ability to disable the game (e.g. when deployed on a server, change this so each user can only play it once a day)
@@ -167,7 +216,8 @@ server <- function(input, output, session) {
         } else {
           # failed after all tries
           if (nAttempt>nGuesses-2){
-            showNotification("Try again later!")
+            gameState$failed <- T
+            showNotification(paste("Try again later! The answer is '", gameState$wordleGame$target_word, "'.", sep = ''))
             shinyjs::disable("done")
           }
           gameState$lockedRows <- (1:nGuesses)[-(nAttempt+2)]
@@ -181,11 +231,15 @@ server <- function(input, output, session) {
     }
   })
   resultToShare <- reactive({
-    if(gameState$is_solved) {
+    if(gameState$is_solved | gameState$failed) {
       ansi2html(getBlocksToShare(gameState$wordleGame))
     }
     else {
-      HTML("Result will be available once you successfully guess the word.")
+      if(testMode & !is.null(gameState$wordleGame)){
+        HTML(paste("Test mode on. The answer is '", gameState$wordleGame$target_word, "'.", sep = ''))
+      } else {
+        HTML("Colored blocks will be available here.")
+      }
     }
   })
   output$result <- renderUI({
