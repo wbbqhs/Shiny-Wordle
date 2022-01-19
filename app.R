@@ -181,6 +181,7 @@ server <- function(input, output, session) {
     gameState$is_solved <- F
     gameState$failed <- F
     gameState$lettersExcluded <- ''
+    gameState$lettersIncluded <- ''
   })
   
   observeEvent(input$getNewWord, {
@@ -201,7 +202,8 @@ server <- function(input, output, session) {
       gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
       gameState$is_solved <- F
       gameState$failed <- F
-      gameState$lettersExcluded
+      gameState$lettersExcluded <- ''
+      gameState$lettersIncluded <- ''
     }
   })
   
