@@ -5,7 +5,11 @@ library(rhandsontable)
 library(wordle)
 library(fansi)
 # use a randomized version of the official wordle word list
-load('data/wordle_dict_rand.Rda')
+# load('data/wordle_dict_rand.Rda')
+# word_list <- wordle_dict_rand
+# use a randomized version of the 5000 most common word list
+load('data/wordle_dict_common.Rda')
+word_list <- wordle_dict_common
 nGuesses <- 6
 nLetters <- 5
 initRow <- rep(" ", nGuesses)
@@ -23,6 +27,15 @@ getBlocksToShare  <-  function(wordleInstance) {
     blockToShare <- paste(blockToShare, "\n", paste(blocks[response], collapse = ""))
   }
   return(blockToShare)
+}
+
+getLettersExcluded <- function(gameState){
+  inputTable <- gameState$inputTable
+  colorMat <- gameState$colorMat
+  allLetters <- unique(inputTable[colorMat != 'TBD'])
+  includedLetters <- unique(inputTable[colorMat == 'green' | colorMat == 'yellow'])
+  # note that a grey letter can be a letter that's green in a different position
+  return(sort(setdiff(allLetters, includedLetters)))
 }
 
 ansi2html <- function(ansi){
@@ -111,9 +124,18 @@ ui <- function() {
                      ),
     # Horizontal line ----
     tags$hr(),
-    rHandsontableOutput('InputTable'),
-      # , verbatimTextOutput("debug")
-      # , keyboardInput("keebs", color_palette = "sharla1")
+    fluidRow(
+      column(6, "Make your guess", 
+             rHandsontableOutput('InputTable')
+             # , verbatimTextOutput("debug")
+             # , keyboardInput("keebs", color_palette = "sharla1"))
+            ),
+      column(6, "Letters not included", 
+             verbatimTextOutput("lettersExcluded")
+             # , verbatimTextOutput("debug")
+             # , keyboardInput("keebs", color_palette = "sharla1"))
+            )
+    ),
     br(),
     actionButton(inputId = "done", label = "Check"),
     tags$hr(),
@@ -135,17 +157,19 @@ server <- function(input, output, session) {
       shinyjs::runjs(selectFirstCellJS)
     }
     if (input$gameMode == "daily"){
-      targetWord <- wordle_dict_rand[wordIndex]
+      targetWord <- word_list[wordIndex]
+      # targetWord <-  'shire'
     } else {
-      targetWord <- wordle_dict_rand[sample(1:length(wordle_dict_rand), 1)]
+      targetWord <- sample(word_list, 1)
     }
     shinyjs::enable("done")
-    gameState$wordleGame <- WordleGame$new(wordle_dict_rand, target_word = targetWord)
+    gameState$wordleGame <- WordleGame$new(word_list, target_word = targetWord)
     gameState$lockedRows <- 2:nGuesses
     gameState$inputTable <- inputInit
     gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
     gameState$is_solved <- F
     gameState$failed <- F
+    gameState$lettersExcluded <- ''
   })
   
   observeEvent(input$getNewWord, {
@@ -159,13 +183,14 @@ server <- function(input, output, session) {
     }
     if (input$gameMode == "unlimited"){
       shinyjs::enable("done")
-      targetWord <- wordle_dict_rand[sample(1:length(wordle_dict_rand), 1)]
-      gameState$wordleGame <- WordleGame$new(wordle_dict_rand, target_word = targetWord)
+      targetWord <- sample(word_list, 1)
+      gameState$wordleGame <- WordleGame$new(word_list, target_word = targetWord)
       gameState$lockedRows <- 2:nGuesses
       gameState$inputTable <- inputInit
       gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
       gameState$is_solved <- F
       gameState$failed <- F
+      gameState$lettersExcluded
     }
   })
   
@@ -206,6 +231,7 @@ server <- function(input, output, session) {
         # update InputTable and colors
         gameState$inputTable[nAttempt+1,] <- inputTable[nAttempt+1, ]
         gameState$colorMat[nAttempt+1,] <- res
+        gameState$lettersExcluded <- getLettersExcluded(gameState)
         # lock guessed rows and unlock one more row if game is not done
         if(gameState$wordleGame$is_solved()){
           showNotification("Success!")
@@ -230,6 +256,9 @@ server <- function(input, output, session) {
       }
     }
   })
+  
+  output$lettersExcluded <- renderText({ gameState$lettersExcluded })
+  
   resultToShare <- reactive({
     if(gameState$is_solved | gameState$failed) {
       ansi2html(getBlocksToShare(gameState$wordleGame))
