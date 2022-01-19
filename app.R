@@ -16,7 +16,7 @@ initRow <- rep(" ", nGuesses)
 inputInit <- as.data.frame(matrix(' ', nGuesses, nLetters))
 colnames(inputInit) <- paste("Letter.", 1:nLetters, sep = '')
 testMode <- F
-isLetterJS <- paste0("[", paste0(paste0("'", c(letters, LETTERS), "'"), 
+isLetterJS <- paste0("[", paste0(paste0("'", c("", " ", letters, LETTERS), "'"), 
                                  collapse = ","), "].indexOf(value) > -1")
 
 blocks <- c(grey = "\U0001f7eb", yellow = "\U0001f7e8", green = "\U0001f7e9")
@@ -29,13 +29,15 @@ getBlocksToShare  <-  function(wordleInstance) {
   return(blockToShare)
 }
 
-getLettersExcluded <- function(gameState){
+getLettersInfo<- function(gameState){
   inputTable <- gameState$inputTable
   colorMat <- gameState$colorMat
   allLetters <- unique(inputTable[colorMat != 'TBD'])
-  includedLetters <- unique(inputTable[colorMat == 'green' | colorMat == 'yellow'])
+  lettersIncluded <- sort(unique(inputTable[colorMat == 'green' | colorMat == 'yellow']))
   # note that a grey letter can be a letter that's green in a different position
-  return(sort(setdiff(allLetters, includedLetters)))
+  # example: guessing serve for shire will produce green, grey, yellow, grey, green
+  lettersExcluded <- sort(setdiff(allLetters, lettersIncluded))
+  return(list(lettersExcluded = lettersExcluded, lettersIncluded = lettersIncluded))
 }
 
 ansi2html <- function(ansi){
@@ -130,8 +132,17 @@ ui <- function() {
              # , verbatimTextOutput("debug")
              # , keyboardInput("keebs", color_palette = "sharla1"))
             ),
-      column(6, "Letters not included", 
-             verbatimTextOutput("lettersExcluded")
+      column(6, "Game Info", 
+             fluidRow(
+               column(12, 
+                      "Letters Included",
+                      verbatimTextOutput("lettersIncluded"))
+             ),
+             fluidRow(
+               column(6,
+                      "Letters Excluded",
+                      verbatimTextOutput("lettersExcluded"))
+             )
              # , verbatimTextOutput("debug")
              # , keyboardInput("keebs", color_palette = "sharla1"))
             )
@@ -208,7 +219,7 @@ server <- function(input, output, session) {
       hot_cols(validator = paste("
            function (value, callback) {
             setTimeout(function(){
-              callback(value.length == 1 && ", isLetterJS,");
+              callback(value.length <= 1 && ", isLetterJS,");
             }, 10)
            }", sep = ''),
                allowInvalid = FALSE)
@@ -231,7 +242,9 @@ server <- function(input, output, session) {
         # update InputTable and colors
         gameState$inputTable[nAttempt+1,] <- inputTable[nAttempt+1, ]
         gameState$colorMat[nAttempt+1,] <- res
-        gameState$lettersExcluded <- getLettersExcluded(gameState)
+        lettersInfo <- getLettersInfo(gameState)
+        gameState$lettersExcluded <- lettersInfo$lettersExcluded
+        gameState$lettersIncluded <- lettersInfo$lettersIncluded
         # lock guessed rows and unlock one more row if game is not done
         if(gameState$wordleGame$is_solved()){
           showNotification("Success!")
@@ -250,13 +263,16 @@ server <- function(input, output, session) {
         }
         # to do: figure out a way to auto select the cell to the right after typing one letter (if possible)
         # select the first cell of the next row and start edit mode
-        selectNextRowJS <- paste("HTMLWidgets.getInstance(InputTable).hot.selectCell(", nAttempt+1, ",0)
-                                  HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().beginEditing()", sep = '')
-        shinyjs::runjs(selectNextRowJS)
+        if(!gameState$is_solved){
+          selectNextRowJS <- paste("HTMLWidgets.getInstance(InputTable).hot.selectCell(", nAttempt+1, ",0)
+                                    HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().beginEditing()", sep = '')
+          shinyjs::runjs(selectNextRowJS)
+        }
       }
     }
   })
   
+  output$lettersIncluded <- renderText({ gameState$lettersIncluded })
   output$lettersExcluded <- renderText({ gameState$lettersExcluded })
   
   resultToShare <- reactive({
