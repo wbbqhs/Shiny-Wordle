@@ -18,7 +18,7 @@ colnames(inputInit) <- paste("Letter.", 1:nLetters, sep = '')
 testMode <- F
 isLetterJS <- paste0("[", paste0(paste0("'", c("", " ", letters, LETTERS), "'"), 
                                  collapse = ","), "].indexOf(value) > -1")
-
+# These are Unicode characters
 blocks <- c(grey = "\U0001f7eb", yellow = "\U0001f7e8", green = "\U0001f7e9")
 
 getBlocksToShare  <-  function(wordleInstance) {
@@ -159,7 +159,8 @@ server <- function(input, output, session) {
   # make sure there is a word of the day
   wordIndex <- as.numeric(difftime(Sys.Date(), as.Date('2022-01-15'), units = 'days'))
   
-  observeEvent(input$gameMode, {
+  observeEvent(list(input$gameMode, input$getNewWord), {
+    # initialize gameState
     if(!is.null(input$InputTable)){
       # exit the edit mode start edit mode on the first cell
       selectFirstCellJS <- paste("HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().cancelChanges()
@@ -182,29 +183,6 @@ server <- function(input, output, session) {
     gameState$failed <- F
     gameState$lettersExcluded <- ''
     gameState$lettersIncluded <- ''
-  })
-  
-  observeEvent(input$getNewWord, {
-    # there should be a way to avoid code duplication but not gonna mess with it for now
-    if(!is.null(input$InputTable)){
-      # issue: cell (0, 0) will retain the previously rendered background color until it has exit edit mode
-      selectFirstCellJS <- paste("HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().cancelChanges()
-                                  HTMLWidgets.getInstance(InputTable).hot.selectCell(0,0)
-                                  HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().beginEditing()", sep = '')
-      shinyjs::runjs(selectFirstCellJS)
-    }
-    if (input$gameMode == "unlimited"){
-      shinyjs::enable("done")
-      targetWord <- sample(word_list, 1)
-      gameState$wordleGame <- WordleGame$new(word_list, target_word = targetWord)
-      gameState$lockedRows <- 2:nGuesses
-      gameState$inputTable <- inputInit
-      gameState$colorMat <- matrix("TBD", nGuesses, nLetters)
-      gameState$is_solved <- F
-      gameState$failed <- F
-      gameState$lettersExcluded <- ''
-      gameState$lettersIncluded <- ''
-    }
   })
   
   output$InputTable <- renderRHandsontable({
