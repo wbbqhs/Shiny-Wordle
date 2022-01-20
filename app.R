@@ -1,6 +1,5 @@
 library(shiny)
 library(shinyjs)
-# library(shinykeyboard)
 library(rhandsontable)
 library(wordle)
 library(fansi)
@@ -14,30 +13,35 @@ ui <- function() {
       tags$style(
         HTML(".shiny-notification {
              position:fixed;
-             top: calc(10%);
+             top: calc(30%);
              left: calc(50%);
              }
              "
         )
       )
     ),
-    
-    radioButtons("gameMode", "Game Mode",
-                 choices = list("Daily Challenge" = "daily", "Unlimited" = "unlimited"),
-                 selected = "daily"),
+    tags$script('
+      $(document).on("keypress", function (e) {
+         Shiny.onInputChange("mydata", e.which);
+      });
+    '),
+    fluidRow(
+      column(6, radioButtons("gameMode", "Game Mode",
+                             choices = list("Daily Challenge" = "daily", "Unlimited" = "unlimited"),
+                             selected = "daily")),
+      column(6, checkboxInput("hardMode", "Hard mode"))
+    ),
     conditionalPanel(condition = "input.gameMode == 'unlimited'",
                      # Input: Select a file ----
                      actionButton(inputId = "getNewWord", label = "Play a new word")
-                     ),
+    ),
     # Horizontal line ----
     tags$hr(),
     fluidRow(
-      column(6, "Make your guess", 
+      column(6, 
              rHandsontableOutput('InputTable')
-             # , verbatimTextOutput("debug")
-             # , keyboardInput("keebs", color_palette = "sharla1"))
             ),
-      column(6, "Game Info", 
+      column(6, 
              fluidRow(
                column(12, 
                       "Letters Included",
@@ -48,8 +52,6 @@ ui <- function() {
                       "Letters Excluded",
                       verbatimTextOutput("lettersExcluded"))
              )
-             # , verbatimTextOutput("debug")
-             # , keyboardInput("keebs", color_palette = "sharla1"))
             )
     ),
     br(),
@@ -90,6 +92,8 @@ server <- function(input, output, session) {
     gameState$lettersIncluded <- ''
   })
   
+  
+  
   output$InputTable <- renderRHandsontable({
     # add ability to disable the game (e.g. when deployed on a server, change this so each user can only play it once a day)
     if(F){
@@ -111,6 +115,8 @@ server <- function(input, output, session) {
     return(inputHOT)
   })
   
+  # To do: add an event representing clicking the check button or pressing enter after all letters has been entered. 
+  
   observeEvent(input$done, {
     inputTable <- hot_to_r(input$InputTable)
     nAttempt <- length(gameState$wordleGame$attempts)
@@ -124,6 +130,14 @@ server <- function(input, output, session) {
         # this happens when the attempt is not in the word list
         showNotification('Not a valid word in the word list.')
       } else {
+        if(input$hardMode){
+          # additional checks if hard mode is on
+          # 1. all green letters must be kept in their positions
+          # 2. yellow letters must appear the max number of times they have appeared in all previous guesses
+          # 3. no excluded letters can appear
+          
+          # if any of the 3 conditions is not met, do nothing to advance the game
+        }
         # update InputTable and colors
         gameState$inputTable[nAttempt+1,] <- inputTable[nAttempt+1, ]
         gameState$colorMat[nAttempt+1,] <- res
@@ -138,21 +152,22 @@ server <- function(input, output, session) {
           gameState$is_solved <- T
           # gameState$wordleGame$share()
         } else {
-          # failed after all tries
           if (nAttempt>nGuesses-2){
+            # failed after all tries
             gameState$failed <- T
             showNotification(paste("Try again later! The answer is '", gameState$wordleGame$target_word, "'.", sep = ''))
             shinyjs::disable("done")
+          } else {
+            # game is not done or solved or failed
+            # select the first cell of the next row and start edit mode
+            selectNextRowJS <- paste("HTMLWidgets.getInstance(InputTable).hot.selectCell(", nAttempt+1, ",0)
+                                  HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().beginEditing()", sep = '')
+            shinyjs::runjs(selectNextRowJS)
           }
           gameState$lockedRows <- (1:nGuesses)[-(nAttempt+2)]
         }
         # to do: figure out a way to auto select the cell to the right after typing one letter (if possible)
-        # select the first cell of the next row and start edit mode
-        if(!gameState$is_solved){
-          selectNextRowJS <- paste("HTMLWidgets.getInstance(InputTable).hot.selectCell(", nAttempt+1, ",0)
-                                    HTMLWidgets.getInstance(InputTable).hot.getActiveEditor().beginEditing()", sep = '')
-          shinyjs::runjs(selectNextRowJS)
-        }
+        
       }
     }
   })
