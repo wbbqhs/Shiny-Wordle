@@ -7,7 +7,7 @@ word_list <- wordle_dict_common
 nGuesses <- 6
 nLetters <- 5
 initRow <- rep(" ", nGuesses)
-inputInit <- as.data.frame(matrix(' ', nGuesses, nLetters))
+inputInit <- as.data.frame(matrix(' ', nGuesses, nLetters), stringsAsFactors = F)
 colnames(inputInit) <- paste("Letter.", 1:nLetters, sep = '')
 testMode <- F
 isLetterJS <- paste0("[", paste0(paste0("'", c("", " ", letters, LETTERS), "'"), 
