@@ -21,8 +21,10 @@ ui <- function() {
       )
     ),
     tags$script('
-      $(document).on("keypress", function (e) {
-         Shiny.onInputChange("mydata", e.which);
+      $(document).on("keyup", function(e) {
+        if(e.keyCode == 13){
+          Shiny.onInputChange("enterPressed", Math.random());
+        }
       });
     '),
     fluidRow(
@@ -100,6 +102,7 @@ server <- function(input, output, session) {
       shinyjs::disable("done")
       showNotification('You have already played this today.', duration = 10)
     }
+    test <- list(input$done, input$enterPressed)
     inputHOT <- rhandsontable(gameState$inputTable) %>%
       hot_row(gameState$lockedRows, readOnly = T) %>%
       hot_cols(renderer = colorRenderer(gameState$colorMat)) %>%
@@ -120,9 +123,10 @@ server <- function(input, output, session) {
   observeEvent(input$done, {
     inputTable <- hot_to_r(input$InputTable)
     nAttempt <- length(gameState$wordleGame$attempts)
+    attemptedWord <- unlist(inputTable[nAttempt+1, ])
     if(nAttempt<=nGuesses-1){
       # read the attempt
-      attempt <- tolower(paste(inputTable[nAttempt+1, ], collapse = ''))
+      attempt <- tolower(paste(attemptedWord, collapse = ''))
       
       # update game state
       res <- gameState$wordleGame$try(attempt, quiet = T)
@@ -139,7 +143,7 @@ server <- function(input, output, session) {
           # if any of the 3 conditions is not met, do nothing to advance the game
         }
         # update InputTable and colors
-        gameState$inputTable[nAttempt+1,] <- inputTable[nAttempt+1, ]
+        gameState$inputTable[nAttempt+1,] <- attemptedWord
         gameState$colorMat[nAttempt+1,] <- res
         lettersInfo <- getLettersInfo(gameState)
         gameState$lettersExcluded <- lettersInfo$lettersExcluded
