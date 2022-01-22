@@ -5,66 +5,79 @@ library(wordle)
 library(fansi)
 source('helper.R')
 
-ui <- function() {
+ui <- function(req) {
   
   fluidPage(
-    useShinyjs(),
+    titlePanel("wordle with helper"),
     tags$head(
-      tags$style(
-        HTML(".shiny-notification {
-             position:fixed;
-             top: calc(30%);
-             left: calc(50%);
-             }
-             "
-        )
-      )
+      tags$style(HTML(customCSS))
     ),
-    tags$script('
-      $(document).on("keyup", function(e) {
-        if(e.keyCode == 13){
-          Shiny.onInputChange("enterPressed", Math.random());
-        }
-      });
-    '),
-    fluidRow(
-      column(6, radioButtons("gameMode", "Game Mode",
-                             choices = list("Daily Challenge" = "daily", "Unlimited" = "unlimited"),
-                             selected = "daily")),
-      column(6, checkboxInput("hardMode", "Hard mode"))
-    ),
-    conditionalPanel(condition = "input.gameMode == 'unlimited'",
-                     # Input: Select a file ----
-                     actionButton(inputId = "getNewWord", label = "Play a new word")
-    ),
-    # Horizontal line ----
-    tags$hr(),
-    fluidRow(
-      column(6, 
-             rHandsontableOutput('InputTable')
-            ),
-      column(6, 
-             fluidRow(
-               column(12, 
-                      "Letters Included",
-                      verbatimTextOutput("lettersIncluded"))
-             ),
-             fluidRow(
-               column(6,
-                      "Letters Excluded",
-                      verbatimTextOutput("lettersExcluded"))
-             )
-            )
-    ),
-    br(),
-    actionButton(inputId = "done", label = "Check"),
-    tags$hr(),
-    htmlOutput("result") 
+    useShinyjs(),
+    tabsetPanel(id = "tabs", 
+                type = "tabs", 
+                tabPanel("Wordle",
+                         tags$script('
+                          $(document).on("keyup", function(e) {
+                            if(e.keyCode == 13){
+                              Shiny.onInputChange("enterPressed", Math.random());
+                            }
+                          });
+                        '),
+                         fluidRow(
+                           column(6, radioButtons("gameMode", "Game Mode",
+                                                  choices = list("Daily Challenge" = "daily", "Unlimited" = "unlimited"),
+                                                  selected = "daily")),
+                           column(6, checkboxInput("hardMode", "Hard mode"))
+                         ),
+                         conditionalPanel(condition = "input.gameMode == 'unlimited'",
+                                          # Input: Select a file ----
+                                          actionButton(inputId = "getNewWord", label = "Play a new word")
+                         ),
+                         # Horizontal line ----
+                         tags$hr(),
+                         fluidRow(
+                           column(6, 
+                                  rHandsontableOutput('InputTable')
+                           ),
+                           column(6, 
+                                  fluidRow(
+                                    column(12, 
+                                           "Letters Included",
+                                           verbatimTextOutput("lettersIncluded"))
+                                  ),
+                                  fluidRow(
+                                    column(6,
+                                           "Letters Excluded",
+                                           verbatimTextOutput("lettersExcluded"))
+                                  )
+                           )
+                         ),
+                         br(),
+                         actionButton(inputId = "done", label = "Check"),
+                         tags$hr(),
+                         htmlOutput("result") 
+                ),
+                tabPanel("Wordle Helper",
+                         actionButton(inputId = "resetHelper", label = "Reset"),
+                         tags$hr(),
+                         fluidRow(
+                           column(6, 'Right click to change color', rHandsontableOutput('helperTable')),
+                           column(6, "Suggested Words", verbatimTextOutput("suggestedWords"))
+                         ),
+                         rHandsontableOutput('helperTable1')
+                )
+    )
+    
   )
 }
 
 server <- function(input, output, session) {
   gameState <- reactiveValues()
+  helperState <- reactiveValues()
+  helperState$initTable <- inputInit
+  helperState$suggestedWords <- NULL
+  helperState$wordleHelper <- WordleHelper$new(nchar = nLetters)
+  
   # make sure there is a word of the day
   wordIndex <- as.numeric(difftime(Sys.Date(), as.Date('2022-01-15'), units = 'days'))
   
@@ -94,7 +107,26 @@ server <- function(input, output, session) {
     gameState$lettersIncluded <- ''
   })
   
-  
+  observeEvent({
+    # the req line is necessary. otherwise it throws an error 'Error in do.call: second argument must be a list'
+    req(input$helperTable1)
+    list(input$helperTable, input$helperTable1)}, {
+    helperTable <- hot_to_r(input$helperTable)
+    helperTable1 <- hot_to_r(input$helperTable1)
+    for (iRow in 1:nrow(helperTable)){
+      attemptedWord <- unlist(helperTable[iRow, ])
+      attemptedWord <- attemptedWord[attemptedWord!=" "]
+      attempt <- tolower(paste(attemptedWord, collapse = ''))
+      lenWord <- nchar(attempt)
+      colorVector <- unlist(helperTable1[iRow, ])
+      colorVector <- colorVector[colorVector!= ' ']
+      lenColor <- length(colorVector)
+      if(lenWord==5 & lenColor==5){
+        helperState$wordleHelper$update(attempt, colorVector)
+        helperState$suggestedWords <- helperState$wordleHelper$words
+      }
+    }
+  })
   
   output$InputTable <- renderRHandsontable({
     # add ability to disable the game (e.g. when deployed on a server, change this so each user can only play it once a day)
@@ -102,7 +134,6 @@ server <- function(input, output, session) {
       shinyjs::disable("done")
       showNotification('You have already played this today.', duration = 10)
     }
-    test <- list(input$done, input$enterPressed)
     inputHOT <- rhandsontable(gameState$inputTable) %>%
       hot_row(gameState$lockedRows, readOnly = T) %>%
       hot_cols(renderer = colorRenderer(gameState$colorMat)) %>%
@@ -117,6 +148,36 @@ server <- function(input, output, session) {
                allowInvalid = FALSE)
     return(inputHOT)
   })
+  
+  output$helperTable <- renderRHandsontable({
+    hotHelper <- rhandsontable(helperState$initTable) %>%
+      # use customOpts to add options in the right click context menu to change cell colors
+      # The JS code set the cell to a class which is defined in the custom css added in the ui
+      hot_context_menu(allowRowEdit = FALSE, allowColEdit = FALSE, customOpts = helperTableCustomMenu)
+    # This will remove the options 'undo', 'redo', 'alignment'
+    hotHelper$x$contextMenu$items[c('undo', 'redo', 'alignment')] <- NULL
+    hotHelper
+  })
+  
+  output$helperTable1 <- renderRHandsontable({
+    hotHelper <- rhandsontable(helperState$initTable) %>%
+      # use customOpts to add options in the right click context menu to change cell colors
+      # The JS code set the cell to a class which is defined in the custom css added in the ui
+      hot_context_menu(allowRowEdit = FALSE, allowColEdit = FALSE, customOpts = helperTableCustomMenu)
+    # This will remove the options 'undo', 'redo', 'alignment'
+    hotHelper$x$contextMenu$items[c('undo', 'redo', 'alignment')] <- NULL
+    hotHelper
+  })
+  
+  observeEvent(input$resetHelper, {
+    # initialize helperState
+    helperState$wordleHelper <- WordleHelper$new(nchar = nLetters)
+    # initialize helperTable
+    helperState$initTable <- inputInit
+    helperState$suggestedWords <- NULL
+  })
+  
+  # shinyjs::hide(id = "helperTable1")
   
   # To do: add an event representing clicking the check button or pressing enter after all letters has been entered. 
   
@@ -178,6 +239,7 @@ server <- function(input, output, session) {
   
   output$lettersIncluded <- renderText({ gameState$lettersIncluded })
   output$lettersExcluded <- renderText({ gameState$lettersExcluded })
+  output$suggestedWords <- renderText({ helperState$suggestedWords })
   
   resultToShare <- reactive({
     if(gameState$is_solved | gameState$failed) {

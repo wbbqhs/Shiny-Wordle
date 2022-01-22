@@ -94,3 +94,76 @@ colorRenderer <-  function(colorMat){
           }", sep = ''
   )
 }
+
+
+customCSS <- ".shiny-notification {
+                 position:fixed;
+                 top: calc(40%);
+                 left: calc(50%);
+              }
+              .handsontable .grey {
+                background: #E9E7E7
+              }
+              .handsontable .yellow {
+                background: #f7ecb7
+              }
+              .handsontable .green {
+                background: #D1F981
+              }
+              .yellow-block,
+              .green-block,
+              .grey-block {
+                width: 30px;
+                height: 15px;
+                border-radius: 10%;
+                float: right;
+                border: 1px solid #aaa;
+              }
+              
+              .yellow-block {
+                background: #f7ecb7;
+              }
+
+              .green-block {
+                background: #ccf7a0;
+              }
+              
+              .grey-block {
+                background: #E9E7E7;
+              }
+              "
+helperTableCustomMenu  <-  list(
+  makeGrey = list(name = "Grey <div class=\"grey-block\"></div>",
+                  callback = htmlwidgets::JS(
+                    "function(key, options) {
+                        thisInstance = HTMLWidgets.getInstance(helperTable).hot
+                        thisInstance.setCellMeta(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'className', 'grey');
+                        thisInstance.render();
+                        thisInstance1 = HTMLWidgets.getInstance(helperTable1).hot
+                        thisInstance1.setDataAtCell(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'grey')
+                      }
+                     ")
+  ),
+  makeYellow = list(name = "Yellow <div class=\"yellow-block\"></div>",
+                    callback = htmlwidgets::JS(
+                      "function(key, options) {
+                        thisInstance = HTMLWidgets.getInstance(helperTable).hot
+                        thisInstance.setCellMeta(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'className', 'yellow');
+                        thisInstance.render();
+                        thisInstance1 = HTMLWidgets.getInstance(helperTable1).hot
+                        thisInstance1.setDataAtCell(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'yellow')
+                      }
+                     ")
+  ),
+  makeGreen = list(name = "Green <div class=\"green-block\"></div>",
+                   callback = htmlwidgets::JS(
+                     "function(key, options) {
+                        thisInstance = HTMLWidgets.getInstance(helperTable).hot
+                        thisInstance.setCellMeta(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'className', 'green');
+                        thisInstance.render();
+                        thisInstance1 = HTMLWidgets.getInstance(helperTable1).hot
+                        thisInstance1.setDataAtCell(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'green')
+                      }
+                     ")
+  )
+)
