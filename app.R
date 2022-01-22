@@ -28,7 +28,7 @@ ui <- function(req) {
                            column(6, radioButtons("gameMode", "Game Mode",
                                                   choices = list("Daily Challenge" = "daily", "Unlimited" = "unlimited"),
                                                   selected = "daily")),
-                           column(6, checkboxInput("hardMode", "Hard mode"))
+                           column(6, checkboxInput("hardMode", "Hard mode (to be implemented)"))
                          ),
                          conditionalPanel(condition = "input.gameMode == 'unlimited'",
                                           # Input: Select a file ----
