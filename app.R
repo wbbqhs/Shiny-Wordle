@@ -58,13 +58,12 @@ ui <- function(req) {
                          htmlOutput("result") 
                 ),
                 tabPanel("Wordle Helper",
-                         actionButton(inputId = "resetHelper", label = "Reset"),
                          tags$hr(),
                          fluidRow(
                            column(6, 'Right click to change color', rHandsontableOutput('helperTable')),
                            column(6, "Suggested Words", verbatimTextOutput("suggestedWords"))
                          ),
-                         rHandsontableOutput('helperTable1')
+                         rHandsontableOutput('colorHelperTable')
                 )
     )
     
@@ -76,7 +75,7 @@ server <- function(input, output, session) {
   helperState <- reactiveValues()
   helperState$initTable <- inputInit
   helperState$suggestedWords <- NULL
-  helperState$wordleHelper <- WordleHelper$new(nchar = nLetters)
+  
   
   # make sure there is a word of the day
   wordIndex <- as.numeric(difftime(Sys.Date(), as.Date('2022-01-15'), units = 'days'))
@@ -109,16 +108,18 @@ server <- function(input, output, session) {
   
   observeEvent({
     # the req line is necessary. otherwise it throws an error 'Error in do.call: second argument must be a list'
-    req(input$helperTable1)
-    list(input$helperTable, input$helperTable1)}, {
+    req(input$colorHelperTable)
+    list(input$helperTable, input$colorHelperTable)}, {
     helperTable <- hot_to_r(input$helperTable)
-    helperTable1 <- hot_to_r(input$helperTable1)
+    colorHelperTable <- hot_to_r(input$colorHelperTable)
+    # need to create a new wordle helper every time anything is updated
+    helperState$wordleHelper <- WordleHelper$new(nchar = nLetters)
     for (iRow in 1:nrow(helperTable)){
       attemptedWord <- unlist(helperTable[iRow, ])
       attemptedWord <- attemptedWord[attemptedWord!=" "]
       attempt <- tolower(paste(attemptedWord, collapse = ''))
       lenWord <- nchar(attempt)
-      colorVector <- unlist(helperTable1[iRow, ])
+      colorVector <- unlist(colorHelperTable[iRow, ])
       colorVector <- colorVector[colorVector!= ' ']
       lenColor <- length(colorVector)
       if(lenWord==5 & lenColor==5){
@@ -159,7 +160,7 @@ server <- function(input, output, session) {
     hotHelper
   })
   
-  output$helperTable1 <- renderRHandsontable({
+  output$colorHelperTable <- renderRHandsontable({
     hotHelper <- rhandsontable(helperState$initTable) %>%
       # use customOpts to add options in the right click context menu to change cell colors
       # The JS code set the cell to a class which is defined in the custom css added in the ui
@@ -177,7 +178,8 @@ server <- function(input, output, session) {
     helperState$suggestedWords <- NULL
   })
   
-  # shinyjs::hide(id = "helperTable1")
+  # not sure how to hide colorHelperTable but still have it store values
+  # shinyjs::hide(id = "colorHelperTable")
   
   # To do: add an event representing clicking the check button or pressing enter after all letters has been entered. 
   

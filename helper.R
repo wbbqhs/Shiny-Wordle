@@ -139,7 +139,7 @@ helperTableCustomMenu  <-  list(
                         thisInstance = HTMLWidgets.getInstance(helperTable).hot
                         thisInstance.setCellMeta(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'className', 'grey');
                         thisInstance.render();
-                        thisInstance1 = HTMLWidgets.getInstance(helperTable1).hot
+                        thisInstance1 = HTMLWidgets.getInstance(colorHelperTable).hot
                         thisInstance1.setDataAtCell(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'grey')
                       }
                      ")
@@ -150,7 +150,7 @@ helperTableCustomMenu  <-  list(
                         thisInstance = HTMLWidgets.getInstance(helperTable).hot
                         thisInstance.setCellMeta(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'className', 'yellow');
                         thisInstance.render();
-                        thisInstance1 = HTMLWidgets.getInstance(helperTable1).hot
+                        thisInstance1 = HTMLWidgets.getInstance(colorHelperTable).hot
                         thisInstance1.setDataAtCell(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'yellow')
                       }
                      ")
@@ -161,7 +161,7 @@ helperTableCustomMenu  <-  list(
                         thisInstance = HTMLWidgets.getInstance(helperTable).hot
                         thisInstance.setCellMeta(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'className', 'green');
                         thisInstance.render();
-                        thisInstance1 = HTMLWidgets.getInstance(helperTable1).hot
+                        thisInstance1 = HTMLWidgets.getInstance(colorHelperTable).hot
                         thisInstance1.setDataAtCell(thisInstance.getSelectedLast()[0], thisInstance.getSelectedLast()[1], 'green')
                       }
                      ")
