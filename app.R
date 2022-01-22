@@ -65,7 +65,7 @@ ui <- function(req) {
                            column(6, "Suggested Words", textOutput("suggestedWords"))
                          ),
                          fluidRow(
-                           column(6, 'For the color impaired', rHandsontableOutput('colorHelperTable'))
+                           column(6, 'For the color impaired or on mobile devices', rHandsontableOutput('colorHelperTable'))
                           )
                 )
     )
@@ -168,6 +168,10 @@ server <- function(input, output, session) {
       # use customOpts to add options in the right click context menu to change cell colors
       # The JS code set the cell to a class which is defined in the custom css added in the ui
       hot_context_menu(allowRowEdit = FALSE, allowColEdit = FALSE, customOpts = helperTableCustomMenu)
+    
+    for(iCol in 1:nLetters){
+      hotHelper <-  hotHelper %>%
+        hot_col(iCol, type = "dropdown", source = c("grey", "yellow", "green"))}
     # This will remove the options 'undo', 'redo', 'alignment'
     hotHelper$x$contextMenu$items[c('undo', 'redo', 'alignment')] <- NULL
     hotHelper
