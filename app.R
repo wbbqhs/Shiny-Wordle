@@ -64,7 +64,9 @@ ui <- function(req) {
                            column(6, 'Right click to change color', rHandsontableOutput('helperTable')),
                            column(6, "Suggested Words", textOutput("suggestedWords"))
                          ),
-                         rHandsontableOutput('colorHelperTable')
+                         fluidRow(
+                           column(6, 'For the color impaired', rHandsontableOutput('colorHelperTable'))
+                          )
                 )
     )
     
