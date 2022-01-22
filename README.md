@@ -6,4 +6,6 @@ This is a Shiny app based on the R wordle package by mikefc available [here](htt
 Original game [wordle](https://www.powerlanguage.co.uk/wordle/)
 
 
-![Screenshot of this app](image/example.png)
+![Screenshot of the game](image/example.png)
+
+![Screenshot of the helper](image/helper_example.png)
