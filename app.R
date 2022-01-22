@@ -12,6 +12,7 @@ ui <- function(req) {
     tags$head(
       tags$style(HTML(customCSS))
     ),
+    tags$head(tags$style(HTML("pre { white-space: pre-wrap; word-break: keep-all; }"))),
     useShinyjs(),
     tabsetPanel(id = "tabs", 
                 type = "tabs", 
@@ -61,7 +62,7 @@ ui <- function(req) {
                          tags$hr(),
                          fluidRow(
                            column(6, 'Right click to change color', rHandsontableOutput('helperTable')),
-                           column(6, "Suggested Words", verbatimTextOutput("suggestedWords"))
+                           column(6, "Suggested Words", textOutput("suggestedWords"))
                          ),
                          rHandsontableOutput('colorHelperTable')
                 )
@@ -74,7 +75,7 @@ server <- function(input, output, session) {
   gameState <- reactiveValues()
   helperState <- reactiveValues()
   helperState$initTable <- inputInit
-  helperState$suggestedWords <- NULL
+  helperState$suggestedWords <- ""
   
   
   # make sure there is a word of the day
@@ -124,7 +125,7 @@ server <- function(input, output, session) {
       lenColor <- length(colorVector)
       if(lenWord==5 & lenColor==5){
         helperState$wordleHelper$update(attempt, colorVector)
-        helperState$suggestedWords <- helperState$wordleHelper$words
+        helperState$suggestedWords <- paste0(helperState$wordleHelper$words, collapse = ", ")
       }
     }
   })
