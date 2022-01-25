@@ -167,3 +167,53 @@ helperTableCustomMenu  <-  list(
                      ")
   )
 )
+
+validateHardMode <- function(gameState, attemptedWord){
+  # additional checks if hard mode is on
+  greenValidated <- T
+  greenPositions <- which(gameState$colorMat=='green', arr.ind = T)
+  if(nrow(greenPositions)!=0){
+    # there are green letters
+    greenInds <- greenPositions[,2]
+    for(i in 1:length(greenInds)){
+      greenColInd <- greenInds[i]
+      greenRowInd <- greenPositions[i,1]
+      if(attemptedWord[greenColInd]!=gameState$inputTable[greenRowInd, greenColInd]){
+        greenValidated <- F
+        break
+      }
+    }
+  }
+  # 2. yellow letters must appear the max number of times they have appeared in all previous guesses
+  yellowValidated <- T
+  yellowPositions <- which(gameState$colorMat=='yellow', arr.ind = T)
+  if(nrow(yellowPositions)!=0){
+    rowsWithYellow <- unique(yellowPositions[,1])
+    bStop <- F
+    for(i in rowsWithYellow){
+      yellowLetters <- gameState$inputTable[yellowPositions[yellowPositions[,1]==i,]]
+      uniqueYellowLetters <- unique(yellowLetters)
+      for(letter in uniqueYellowLetters){
+        nTimes <- length(which(yellowLetters==letter))
+        nTimesInNewWord <- length(which(attemptedWord==letter))
+        if (nTimesInNewWord<nTimes){
+          bStop  <-  T
+          break
+        }
+      }
+      if(bStop){
+        yellowValidated <- F
+        break
+      }
+    }
+  }
+  # 3. no excluded letters can appear
+  greyValidated <- T
+  for(letter in attemptedWord){
+    if(letter %in% gameState$lettersExcluded){
+      greyValidated <- F
+      break
+    }
+  }
+  return(greenValidated & yellowValidated & greyValidated)
+}

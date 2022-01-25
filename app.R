@@ -28,7 +28,7 @@ ui <- function(req) {
                            column(6, radioButtons("gameMode", "Game Mode",
                                                   choices = list("Daily Challenge" = "daily", "Unlimited" = "unlimited"),
                                                   selected = "daily")),
-                           column(6, checkboxInput("hardMode", "Hard mode (to be implemented)"))
+                           column(6, checkboxInput("hardMode", "Hard mode"))
                          ),
                          conditionalPanel(condition = "input.gameMode == 'unlimited'",
                                           # Input: Select a file ----
@@ -94,7 +94,7 @@ server <- function(input, output, session) {
     }
     if (input$gameMode == "daily"){
       targetWord <- word_list[wordIndex]
-      # targetWord <-  'shire'
+      targetWord <-  'deeds'
     } else {
       targetWord <- sample(word_list, 1)
     }
@@ -198,19 +198,22 @@ server <- function(input, output, session) {
       # read the attempt
       attempt <- tolower(paste(attemptedWord, collapse = ''))
       
-      # update game state
+      # update game state but backup first in case it's hard mode and the attempt doesn't qualify
       res <- gameState$wordleGame$try(attempt, quiet = T)
       if(is.null(res)){
         # this happens when the attempt is not in the word list
         showNotification('Not a valid word in the word list.')
       } else {
         if(input$hardMode){
-          # additional checks if hard mode is on
-          # 1. all green letters must be kept in their positions
-          # 2. yellow letters must appear the max number of times they have appeared in all previous guesses
-          # 3. no excluded letters can appear
-          
-          # if any of the 3 conditions is not met, do nothing to advance the game
+          # if the new attempt does not satisfy the conditions of hard mode, do nothing to advance the game
+          if(!validateHardMode(gameState, attemptedWord)){
+            # revert wordleGame to what it was before the attempt
+            totalAttempts <- length(gameState$wordleGame$attempts)
+            gameState$wordleGame$attempts <- gameState$wordleGame$attempts[-totalAttempts]
+            gameState$wordleGame$responses <- gameState$wordleGame$responses[-totalAttempts]
+            showNotification('Hard mode on but not all clues are utilized!')
+            return()
+          }
         }
         # update InputTable and colors
         gameState$inputTable[nAttempt+1,] <- attemptedWord
