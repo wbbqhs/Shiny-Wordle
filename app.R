@@ -94,7 +94,7 @@ server <- function(input, output, session) {
     }
     if (input$gameMode == "daily"){
       targetWord <- word_list[wordIndex]
-      targetWord <-  'deeds'
+      # targetWord <-  'deeds'
     } else {
       targetWord <- sample(word_list, 1)
     }
